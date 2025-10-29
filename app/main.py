@@ -15,7 +15,7 @@ from app.routers.song import router as song_router
 from app.routers.update import router as update_router
 from app.routers.select import router as select_router
 
-app = FastAPI()
+app = FastAPI(root_path="/v2")
 
 # 全局中间件
 app.add_middleware(
@@ -28,7 +28,7 @@ app.add_middleware(
 
 @app.get("/", include_in_schema=False)
 async def root():
-    return RedirectResponse(url="/docs")
+    return RedirectResponse(url="/v2/docs")
 
 # 挂载子路由
 app.include_router(update_router)

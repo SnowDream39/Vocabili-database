@@ -1,2 +1,2 @@
-source /var/www/Vocawiki-database/venv/bin/activate
-python3 /var/www/Vocawiki-database/start.py
+source /var/www/Vocabili-database/venv/bin/activate
+python3 /var/www/Vocabili-database/start.py
