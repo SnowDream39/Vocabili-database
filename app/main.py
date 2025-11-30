@@ -14,6 +14,7 @@ from app.routers.producer import router as producer_router
 from app.routers.song import router as song_router
 from app.routers.update import router as update_router
 from app.routers.select import router as select_router
+from app.routers.upload import router as upload_router
 
 app = FastAPI(root_path="/v2")
 
@@ -33,3 +34,4 @@ async def root():
 # 挂载子路由
 app.include_router(update_router)
 app.include_router(select_router)
+app.include_router(upload_router)
