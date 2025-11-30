@@ -2,6 +2,10 @@
 
 基于 postgreSQL + SQLAlchemy + FastAPI 的数据后端
 
+## 数据库范式设计
+
+参见 [我的博客文章](https://blog.snowdream39.top/?p=204)。
+
 ## 历史标注修改
 
 有时候一个 bvid 被改了 name。这个事情需要理性分析。
