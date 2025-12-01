@@ -157,8 +157,6 @@ async def insert_videos(
             .rename(columns={'image_url': 'thumbnail'})[['bvid', 'title', 'pubdate', 'song_id', 'uploader_id', 'copyright', 'thumbnail']]
         )
         
-        print(missing_video_df['bvid'].to_list())
-
         # 允许 uploader 为空，只是需要防止出现 NaN
         missing_video_df["uploader_id"] = missing_video_df["uploader_id"].astype("Int64")
         missing_video_df = missing_video_df.replace({pd.NA: None})
