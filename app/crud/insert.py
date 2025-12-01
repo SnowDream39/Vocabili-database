@@ -6,7 +6,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models import Song, Producer, Synthesizer, Vocalist, Uploader, Video, song_producer, song_synthesizer, song_vocalist, Snapshot, Ranking
 
-from ..utils import generate_board_file_path, validate_excel, read_excel
+from ..utils import validate_excel, read_excel
+from ..utils.filename import generate_board_file_path
 from ..utils.cache import Cache
 
 import pandas as pd

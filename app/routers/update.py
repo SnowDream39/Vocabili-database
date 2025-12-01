@@ -8,7 +8,8 @@ from sqlalchemy.exc import IntegrityError
 from app.session import get_async_session
 from app.models import Song, Producer, Synthesizer, Vocalist, Uploader, Video, song_producer, song_synthesizer, song_vocalist, Snapshot, Ranking
 
-from ..utils import generate_board_file_path, validate_excel, read_excel
+from ..utils import validate_excel, read_excel
+from ..utils.filename import generate_board_file_path
 from ..utils.cache import Cache
 from ..crud.insert import execute_import_rankings, execute_import_snapshots, execute_import_songs
 

@@ -1,36 +1,6 @@
-from datetime import date, timedelta
-from dateutil.relativedelta import relativedelta
-import pandas as pd
+import pandas  as pd
 from fastapi import HTTPException
 
-def generate_board_file_path(
-    board: str,
-    part: str,
-    issue: int
-) -> str:
-    board_folder = {
-        'vocaloid-daily': '日刊',
-        'vocaloid-weekly': '周刊',
-        'vocaloid-monthly': '月刊',
-    }[board]
-    part_folder = {
-        'main': '总榜',
-        'new': '新曲榜'
-    }[part]
-    if board == 'vocaloid-daily':
-        end_date = date(2024,7,3) + timedelta(issue)
-        start_date = end_date - timedelta(1)
-        return f"./data/{board_folder}/{part_folder}/{'新曲榜' if part == 'new' else ''}{end_date.strftime('%Y%m%d')}与{start_date.strftime('%Y%m%d')}.xlsx"
-    elif board == 'vocaloid-weekly':
-        end_date = date(2024,8,31) + timedelta(issue*7)
-        return f"./data/{board_folder}/{part_folder}/{'新曲榜' if part == 'new' else ''}{end_date.strftime('%Y-%m-%d')}.xlsx"
-    elif board == 'vocaloid-weekly':
-        month = date(2024,6,1) + relativedelta(months=issue)
-        return f"./data/{board_folder}/{part_folder}/{'新曲榜' if part == 'new' else ''}{month.strftime('%Y-%m')}.xlsx"
-    else:
-        raise Exception('输入不符合条件')
-
-        
 def validate_excel(df: pd.DataFrame):
     df['__row__'] = df.index + 2
     errors: list[str] = []
