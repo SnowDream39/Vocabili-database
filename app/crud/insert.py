@@ -256,6 +256,8 @@ async def execute_import_rankings(
     ).assign( board = board, part = part, issue = issue)
     
     if strict:
+        # 严格模式的意义就在于这里有验证
+        # 验证过后，还是按照一般那样，很多字段允许null
         errors = validate_excel(df)
         if len(errors) >= 1:
             raise Exception("\n".join(errors))
@@ -278,18 +280,19 @@ async def execute_import_rankings(
                 part=part
             )[['board', 'part', 'issue', 'rank','bvid','count','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
             insert_df['count'] = insert_df['count'].astype("Int64")
-            insert_df['count'] = insert_df['count'].replace({pd.NA: None})
             insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
-            records = insert_df.to_dict(orient='records')
         
         else: 
+            await insert_videos(session, batch_df, cache)
             insert_df = batch_df.assign(
                 board=board,
                 issue=issue,
                 part=part
             )[['board', 'part', 'issue', 'rank','bvid','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
             insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
-            records = insert_df.to_dict(orient='records')
+
+        insert_df = insert_df.replace({pd.NA: None})
+        records = insert_df.to_dict(orient='records')
         
         insert_stmt = pg_insert(Ranking).values(records).on_conflict_do_nothing()
         await session.execute(insert_stmt)
