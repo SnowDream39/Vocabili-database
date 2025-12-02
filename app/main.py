@@ -17,8 +17,10 @@ from app.routers.select import router as select_router
 from app.routers.upload import router as upload_router
 from app.routers.test import router as test_router
 from app.routers.edit import router as edit_router
-from app.utils.task import task_manager, cleanup_worker
+from app.routers.output import router as output_router
 
+
+from app.utils.task import task_manager, cleanup_worker
 app = FastAPI(root_path="/v2")
 
 # 全局中间件
@@ -40,6 +42,7 @@ app.include_router(select_router)
 app.include_router(upload_router)
 app.include_router(test_router)
 app.include_router(edit_router)
+app.include_router(output_router)
 
 # 设置自动任务
 @app.on_event("startup")

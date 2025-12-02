@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload, aliased
 
 from app.session import get_async_session, engine
 from app.models import Song, Producer, Synthesizer, Vocalist, Uploader, Video, Ranking, Snapshot, TABLE_MAP, REL_MAP
-
+from app.crud.select import get_songs_detail
 from datetime import datetime
 
 router = APIRouter(prefix='/select', tags=['select'])
@@ -20,19 +20,8 @@ async def songs_detail(
     total_result = await session.execute(select(func.count()).select_from(Song))
     total = total_result.scalar_one()  # 获取总数
 
-    stmt = (
-        select(Song)
-        .options(
-            selectinload(Song.producers),
-            selectinload(Song.synthesizers),
-            selectinload(Song.vocalists),
-            selectinload(Song.videos)
-        )
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
-    result = await session.execute(stmt)
-    data = result.scalars().all()
+    
+    data = await get_songs_detail(page, page_size, session)
     return {
         'status': 'ok',
         'data': data,

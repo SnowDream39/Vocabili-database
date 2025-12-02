@@ -119,7 +119,9 @@ class Video(Base):
     uploader_id: Mapped[int] = mapped_column(Integer, ForeignKey('uploader.id'), nullable=True)
     song_id: Mapped[int] = mapped_column(Integer, ForeignKey('song.id'), nullable=False)
     copyright: Mapped[int] = mapped_column(SmallInteger, nullable=True)
-    thumbnail: Mapped[str] = mapped_column(Text)
+    thumbnail: Mapped[str] = mapped_column(Text, nullable=True)
+    duration: Mapped[int] = mapped_column(SmallInteger, nullable=True)
+    page: Mapped[int] = mapped_column(SmallInteger, nullable=True)
 
     uploader: Mapped["Uploader"] = relationship("Uploader", back_populates="videos")
     song: Mapped["Song"] = relationship("Song", back_populates="videos")

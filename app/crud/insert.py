@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Song, Producer, Synthesizer, Vocalist, Uploader, Video, song_producer, song_synthesizer, song_vocalist, Snapshot, Ranking
+from app.utils.misc import make_duration_int
 
 from ..utils import validate_excel, read_excel
 from ..utils.filename import generate_board_file_path
@@ -154,13 +155,22 @@ async def insert_videos(
                 song_id= lambda df: df['name'].map(cache.song_map),
                 uploader_id=lambda df: df['uploader'].map(cache.artist_maps[Uploader])
             )
-            .rename(columns={'image_url': 'thumbnail'})[['bvid', 'title', 'pubdate', 'song_id', 'uploader_id', 'copyright', 'thumbnail']]
+            .rename(columns={'image_url': 'thumbnail'})
         )
+        if 'duration' not in missing_video_df.columns:
+            missing_video_df['duration'] = None,
+        if 'page' not in missing_video_df.columns:
+            missing_video_df['page'] = None
+
+        
+        missing_video_df = missing_video_df[['bvid', 'title', 'pubdate', 'song_id', 'uploader_id', 'copyright', 'thumbnail', 'page', 'duration']]
         
         # 允许 uploader 为空，只是需要防止出现 NaN
         missing_video_df["uploader_id"] = missing_video_df["uploader_id"].astype("Int64")
         # 因为有莫名其妙缺copyright的情况，可能是以前，唉随便了
         missing_video_df["copyright"] = missing_video_df["copyright"].astype("Int64")
+        missing_video_df['page'] = missing_video_df['page'].astype("Int64")
+        missing_video_df['duration'] = missing_video_df['duration'].apply(make_duration_int)
         missing_video_df = missing_video_df.replace({pd.NA: None})
 
         if (len(missing_video_df) > 0):
@@ -169,7 +179,7 @@ async def insert_videos(
             stmt = pg_insert(Video).values(missing_video_records).on_conflict_do_update(
                 index_elements=['bvid'],
                 set_={field: excluded[field] for field in [
-                    'title', 'pubdate', 'uploader_id', 'song_id', 'copyright', 'thumbnail'
+                    'title', 'pubdate', 'uploader_id', 'song_id', 'copyright', 'thumbnail', 'duration', 'page'
                 ]}
             )
             await session.execute(stmt)
