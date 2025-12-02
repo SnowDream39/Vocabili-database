@@ -242,8 +242,7 @@ async def execute_import_rankings(
     ):
     if not cache:
         cache = Cache()
-    if not cache:
-        cache = Cache()
+
     delete_stmt = delete(Ranking).where(
         (Ranking.board == board) &
         (Ranking.part == part) &
@@ -259,7 +258,7 @@ async def execute_import_rankings(
     if strict:
         errors = validate_excel(df)
         if len(errors) >= 1:
-            raise HTTPException(400, "\n".join(errors))
+            raise Exception("\n".join(errors))
 
     
     total = len(df)
@@ -280,6 +279,7 @@ async def execute_import_rankings(
             )[['board', 'part', 'issue', 'rank','bvid','count','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
             insert_df['count'] = insert_df['count'].astype("Int64")
             insert_df['count'] = insert_df['count'].replace({pd.NA: None})
+            insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
             records = insert_df.to_dict(orient='records')
         
         else: 
@@ -288,6 +288,7 @@ async def execute_import_rankings(
                 issue=issue,
                 part=part
             )[['board', 'part', 'issue', 'rank','bvid','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
+            insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
             records = insert_df.to_dict(orient='records')
         
         insert_stmt = pg_insert(Ranking).values(records).on_conflict_do_nothing()

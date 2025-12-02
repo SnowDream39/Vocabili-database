@@ -100,6 +100,10 @@ class Song(Base):
         "Video",
         back_populates="song"
     )
+    rankings: Mapped[List["Ranking"]] = relationship(
+        "Ranking", 
+        back_populates="song"
+    )
 
 class Video(Base):
     """
@@ -148,6 +152,7 @@ class Ranking(Base):
     part: Mapped[str] = mapped_column(String(20))
     issue: Mapped[str] = mapped_column(SmallInteger, index=True)
     rank: Mapped[int] = mapped_column(Integer, index=True)
+    song_id: Mapped[int] = mapped_column(Integer, ForeignKey('song.id'), index=True)
     bvid: Mapped[str] = mapped_column(String(12), ForeignKey('video.bvid'), index=True)
     count: Mapped[int] = mapped_column(SmallInteger, nullable=True)
     point: Mapped[int] = mapped_column(Integer)
@@ -160,6 +165,7 @@ class Ranking(Base):
     coin_rank: Mapped[int] = mapped_column(Integer)
     like_rank: Mapped[int] = mapped_column(Integer)
 
+    song: Mapped["Song"] = relationship("Song", back_populates="rankings")
     video: Mapped["Video"] = relationship("Video", back_populates="rankings")
     
     __table_args__ = (
