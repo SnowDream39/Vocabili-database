@@ -146,6 +146,63 @@ async def ranking(
         'total': total
     }
     
+@router.get('/ranking/top5')
+async def ranking_top5(
+    board: str = Query("vocaloid-daily"),
+    part: str = Query("main"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1),
+    session: AsyncSession = Depends(get_async_session)
+):
+
+    
+    stmt = (
+        select(Ranking)
+        .where(
+            Ranking.rank <= 5,
+            Ranking.board == board,
+            Ranking.part == part
+        )
+        .options(
+            selectinload(Ranking.song).selectinload(Song.vocalists),
+            selectinload(Ranking.song).selectinload(Song.producers),
+            selectinload(Ranking.song).selectinload(Song.synthesizers),
+            selectinload(Ranking.video).selectinload(Video.uploader)
+        )
+        .order_by(Ranking.issue.desc(), Ranking.rank)
+        .offset((page-1) * page_size * 5)
+        .limit(page_size*5)
+    )
+    result = await session.execute(stmt)
+    original_data = result.scalars().all()
+    
+    data = []
+    length = len(original_data)
+    i = 0
+    while i*5 < length:
+        data.append({
+            'issue': original_data[i*5].issue,
+            'rankings': []
+        })
+        for j in range(5):
+            data[i]['rankings'].append(original_data[i*5+j])
+        i+=1
+            
+
+    # 查询排行的总期数
+    total_result = await session.execute(
+        select(func.count(func.distinct(Ranking.issue)))
+        .where(Ranking.board == board, Ranking.part == part)
+    )
+    total = total_result.scalar_one()
+
+    return {
+        'status': 'ok',
+        'data': data,
+        'total': total
+    }
+    
+    
 @router.get('/latest_ranking')
 async def latest_ranking(
     board: str = Query("vocaloid-daily"),
