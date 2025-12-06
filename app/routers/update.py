@@ -60,7 +60,6 @@ async def import_snapshots(
     """
     try:
         await execute_import_snapshots(session, date, not old)
-        await session.commit()
 
     except IntegrityError as e:
         await session.rollback()
@@ -114,8 +113,6 @@ async def import_rankings(
     try:
         await execute_import_rankings(session, board, part, issue, strict, cache)
 
-        await session.commit()
-
     except IntegrityError as e:
         await session.rollback()
         print("❌ 插入数据出错:", e)
@@ -151,7 +148,6 @@ async def batch_import_ranking(
         for issue in range(start_issue, end_issue+1):
             print(f'正在处理：{issue}期')
             await execute_import_rankings(session, board, part, issue, False, cache)
-            await session.commit()
 
     except IntegrityError as e:
 

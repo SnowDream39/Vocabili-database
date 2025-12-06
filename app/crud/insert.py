@@ -273,38 +273,48 @@ async def execute_import_rankings(
         if len(errors) >= 1:
             raise Exception("\n".join(errors))
 
+    try:
+        
+        total = len(df)
+        for start in range(0, total, BATCH_SIZE):
+            end = start + BATCH_SIZE
+            batch_df = df.iloc[start: end]
+            if (part == 'new'):
+                batch_df = batch_df.copy()
+                batch_df['thumbnail'] = None
+            if (part != 'new' and board in ['vocaloid-daily', 'vocaloid-weekly']):
+                await insert_artists(session, batch_df, cache)
+                new_songs = await insert_songs(session, batch_df, cache)
+                if new_songs:
+                    await insert_relations(session, batch_df, strict, new_songs, cache)
+                await insert_videos(session, batch_df, cache)
+
+                insert_df = batch_df.assign(
+                    board=board,
+                    issue=issue,
+                    part=part
+                )[['board', 'part', 'issue', 'rank','bvid','count','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
+                insert_df['count'] = insert_df['count'].astype("Int64")
+                insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
+            
+            else: 
+                await insert_videos(session, batch_df, cache)
+                insert_df = batch_df.assign(
+                    board=board,
+                    issue=issue,
+                    part=part
+                )[['board', 'part', 'issue', 'rank','bvid','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
+                insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
+
+            insert_df = insert_df.replace({pd.NA: None})
+            records = insert_df.to_dict(orient='records')
+            
+            insert_stmt = pg_insert(Ranking).values(records).on_conflict_do_nothing()
+            await session.execute(insert_stmt)
+            await session.commit()
     
-    total = len(df)
-    for start in range(0, total, BATCH_SIZE):
-        end = start + BATCH_SIZE
-        batch_df = df.iloc[start: end]
-        if (part != 'new'):
-            await insert_artists(session, batch_df, cache)
-            new_songs = await insert_songs(session, batch_df, cache)
-            if new_songs:
-                await insert_relations(session, batch_df, strict, new_songs, cache)
-            await insert_videos(session, batch_df, cache)
-
-            insert_df = batch_df.assign(
-                board=board,
-                issue=issue,
-                part=part
-            )[['board', 'part', 'issue', 'rank','bvid','count','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
-            insert_df['count'] = insert_df['count'].astype("Int64")
-            insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
-        
-        else: 
-            await insert_videos(session, batch_df, cache)
-            insert_df = batch_df.assign(
-                board=board,
-                issue=issue,
-                part=part
-            )[['board', 'part', 'issue', 'rank','bvid','point','view','favorite','coin','like','view_rank','favorite_rank','coin_rank','like_rank']]
-            insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
-
-        insert_df = insert_df.replace({pd.NA: None})
-        records = insert_df.to_dict(orient='records')
-        
-        insert_stmt = pg_insert(Ranking).values(records).on_conflict_do_nothing()
-        await session.execute(insert_stmt)
+    except IntegrityError as e:
+        await session.rollback()
+        print("插入数据出错:", e)
+    
 
