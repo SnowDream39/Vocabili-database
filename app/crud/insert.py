@@ -157,6 +157,7 @@ async def insert_videos(
                 uploader_id=lambda df: df['uploader'].map(cache.artist_maps[Uploader])
             )
             .rename(columns={'image_url': 'thumbnail'})
+            .loc[df.song_id.notna()]
         )
         if 'duration' not in missing_video_df.columns:
             missing_video_df['duration'] = None,

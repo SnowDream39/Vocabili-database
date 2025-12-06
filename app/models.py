@@ -5,9 +5,6 @@ from datetime import datetime
 from datetime import date as datetype
 from typing import List
 
-
-
-
 metadata = MetaData(schema="public")
 class Base(DeclarativeBase):
     metadata = metadata
@@ -40,6 +37,7 @@ song_vocalist = Table(
 class Artist:
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(Text, unique=True)
+    vocadb_id: Mapped[int] = mapped_column(Integer, nullable=True)
 
 class Producer(Artist, Base):
     """
