@@ -6,3 +6,4 @@ alembic.ini
 cookbook.md
 data/**
 *.xlsx
+*.ps1
