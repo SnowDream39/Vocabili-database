@@ -60,6 +60,7 @@ async def get_all_included_songs(session: AsyncSession):
 
             Song.name.label("song_name"),
             Song.type.label("song_type"),
+            Song.display_name.label("song_display_name"),
 
             Uploader.name.label("uploader_name"),
 
@@ -94,6 +95,7 @@ async def get_all_included_songs(session: AsyncSession):
             Video.copyright,
             Song.name,
             Song.type,
+            Song.display_name,
             Uploader.name,
             Snapshot.view,
         )
@@ -105,7 +107,7 @@ async def get_all_included_songs(session: AsyncSession):
     records = []
     for (
         title, bvid, pubdate, copyright,
-        thumbnail, song_name, song_type,
+        thumbnail, song_name, song_type, song_display_name,
         uploader_name, view,
         producers, synthesizers, vocalists
     ) in rows:
@@ -115,6 +117,7 @@ async def get_all_included_songs(session: AsyncSession):
             "bvid": bvid,
             "aid": str(bv2av(bvid)),
             "name": song_name,
+            "display_name": song_display_name,
             "view": view,
             "pubdate": pubdate.strftime("%Y-%m-%d %H:%M:%S"),
             "author": '、'.join(producers or []),

@@ -42,7 +42,7 @@ async def export_songs(
     # 返回文件响应，提供下载
     return FileResponse(
         path=temp_file.name,
-        filename="收录曲目.xlsx",
+        filename="songs.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=songs.xlsx"}
     )
