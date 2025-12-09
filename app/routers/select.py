@@ -85,7 +85,7 @@ async def artist_songs(
 async def ranking(
     board: str = Query("vocaloid-daily"),
     part: str = Query("main"),
-    issue: int | None = Query(ge=1),
+    issue: int | None = Query(default=None, ge=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1),
     session: AsyncSession = Depends(get_async_session)
