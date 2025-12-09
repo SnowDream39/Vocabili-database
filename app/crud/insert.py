@@ -1,6 +1,6 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_, update, delete
+from sqlalchemy import select, delete, and_, update, delete, insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
@@ -283,10 +283,10 @@ async def update_relations(
 async def insert_videos(
     session: AsyncSession, 
     df: pd.DataFrame, 
+    update: bool = False,
     cache: Cache | None = None
     ):
-    if not cache:
-        cache = Cache()
+
     """
     插入视频。冲突更新。
     
@@ -294,6 +294,9 @@ async def insert_videos(
     
     如果数据里面没有image_url，不会更新。
     """
+    
+    if not cache:
+        cache = Cache()
     
     has_thumbnail = 'image_url' in df.columns
     use_cols = ['bvid', 'title', 'pubdate', 'duration', 'page', 'song_id', 'uploader_id', 'copyright']
@@ -304,7 +307,8 @@ async def insert_videos(
     await cache.ensure_loaded(session, ['video_map', 'song_map', 'artist_maps'])
     df = df.assign(
         song_id = lambda d: d['name'].map(cache.song_map),
-        uploader_id = lambda d: d['uploader'].map(cache.artist_maps[Uploader])
+        uploader_id = lambda d: d['uploader'].map(cache.artist_maps[Uploader]),
+        duration = lambda d: d['duration'].map(make_duration_int)
     )
     
     if has_thumbnail:  
@@ -312,31 +316,32 @@ async def insert_videos(
         use_cols.append('thumbnail')
         normalize_nullable_str_columns(df, ['thumbnail'])
     
-    df = df[use_cols]
+    df = df.loc[df['song_id'].notna()][use_cols].copy()
     
-    # uploader_id 允许为空，先转可空类型
-    df["uploader_id"] = df["uploader_id"].astype("Int64")
-    
-    # duration 特殊转换
-    df["duration"] = df["duration"].apply(make_duration_int)
+    normalize_nullable_int_columns(df, ['uploader_id'])
     
     # 转换成 record dict
     records = df.to_dict(orient="records")
 
-    
-
     # ----------- UPSERT（核心）-----------
-    excluded = pg_insert(Video).excluded
-    stmt = (
-        pg_insert(Video)
-        .values(records)
-        .on_conflict_do_update(
-            index_elements=["bvid"],
-            set_={
-                field: excluded[field] for field in update_cols
-            }
+    if update:
+        excluded = pg_insert(Video).excluded
+        stmt = (
+            pg_insert(Video)
+            .values(records)
+            .on_conflict_do_update(
+                index_elements=["bvid"],
+                set_={
+                    field: excluded[field] for field in update_cols
+                }
+            )
         )
-    )
+    else:
+        stmt = pg_insert(Video).values(records).on_conflict_do_nothing(
+            index_elements=["bvid"]
+        )
+        
+        
     await session.execute(stmt)
 
     # ----------- 更新 cache -----------
@@ -372,7 +377,7 @@ async def execute_import_snapshots(
     for start in range(0, total, BATCH_SIZE):
         end = start + BATCH_SIZE
         batched_df = df.iloc[start:end].copy()
-        await insert_videos(session, batched_df, cache)
+        await insert_videos(session, batched_df, False, cache)
 
         batched_df = batched_df[batched_df['bvid'].isin(cache.video_map.keys())]
         if not batched_df.empty:
@@ -429,7 +434,7 @@ async def execute_import_rankings(
                 await insert_artists(session, batch_df, cache)
                 await insert_songs(session, batch_df, cache)
                 await update_relations(session, batch_df, cache)
-                await insert_videos(session, batch_df, cache)
+                await insert_videos(session, batch_df, True, cache)
 
                 insert_df = batch_df.assign(
                     board=board,
@@ -440,7 +445,7 @@ async def execute_import_rankings(
                 insert_df['song_id'] = insert_df['bvid'].map(cache.video_map)
             
             else: 
-                await insert_videos(session, batch_df, cache)
+                await insert_videos(session, batch_df, False, cache)
                 insert_df = batch_df.assign(
                     board=board,
                     issue=issue,
