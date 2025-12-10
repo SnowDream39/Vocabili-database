@@ -88,7 +88,7 @@ async def ranking(
     issue: int | None = Query(default=None, ge=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1),
-    order_type: Literal['score','view','favorite','coin','like'] = Query(),
+    order_type: Literal['score','view','favorite','coin','like'] = Query(default='score'),
     session: AsyncSession = Depends(get_async_session)
 ):
     if (issue == None):
