@@ -153,28 +153,28 @@ async def insert_artists(
 async def insert_songs(session: AsyncSession, df, cache: Cache | None = None):
     if not cache:
         cache = Cache()
-    ensure_columns(df, ['display_name', 'image_url'])
+    ensure_columns(df, ['image_url'])
     await cache.ensure_loaded(session, ['song_map'])
-    # (name, type, display_name)
-    SongRecord = namedtuple('SongRecord', ['name', 'type', 'display_name'])
+    # (name, type)
+    SongRecord = namedtuple('SongRecord', ['name', 'type'])
     song_records: list[SongRecord] = []
     for row in df.to_dict(orient='records'):
         name = row['name']
         song_type = row['type'] if not pd.isna(row['type']) else None
-        display_name = row['display_name']
         if not pd.isna(name):
-            song_records.append(SongRecord(name, song_type, display_name))
+            song_records.append(SongRecord(name, song_type))
         
     song_records = list(set(song_records))
     if song_records:
         excluded = pg_insert(Song).excluded
-        song_table_columns = ['name', 'type', 'display_name']
+        song_table_columns = ['name', 'type']
         stmt = pg_insert(Song).values([
             {k: v for k, v in s._asdict().items() if k in song_table_columns}
             for s in song_records
             ]).on_conflict_do_update(
             index_elements=['name'],
-            set_={ 'type': excluded['type'], 'display_name': excluded['display_name'] }
+            # 目前不更新 display_name
+            set_={ 'type': excluded['type'] }
         ).returning(Song.id, Song.name)
         result = await session.execute(stmt)
         await session.flush()
