@@ -88,6 +88,7 @@ async def ranking(
     issue: int | None = Query(default=None, ge=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1),
+    order_type: Literal['score','view','favorite','coin','like'] = Query(),
     session: AsyncSession = Depends(get_async_session)
 ):
     if (issue == None):
@@ -96,6 +97,14 @@ async def ranking(
             .where(Ranking.board == board, Ranking.part == part)
         )
         issue = int(result.scalar_one())
+        
+    order_map = {
+        'score': Ranking.rank,
+        'view': Ranking.view_rank,
+        'favorite': Ranking.favorite_rank,
+        'coin': Ranking.coin_rank,
+        'like': Ranking.like_rank
+    }
     
     prev_issue = issue - 1
     PrevRanking = aliased(Ranking)
@@ -116,7 +125,7 @@ async def ranking(
             selectinload(Ranking.video).selectinload(Video.uploader)
         )
         .where(Ranking.board == board, Ranking.part == part, Ranking.issue == issue)
-        .order_by(Ranking.rank)
+        .order_by(order_map[order_type])
         .offset((page-1) * page_size)
         .limit(page_size)
     )
