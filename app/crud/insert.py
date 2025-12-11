@@ -140,7 +140,8 @@ async def insert_artists(
         if not names:
             continue
         new_names = names - cache.artist_maps[table].keys()
-        print(new_names)
+        if (len(new_names) > 0):
+            print(f"{table.__tablename__} 创建artist：{new_names}")
 
         if new_names:
             # 构造要插入的数据
