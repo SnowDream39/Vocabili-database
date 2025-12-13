@@ -16,16 +16,19 @@ async def update_video_streaks(session: AsyncSession, current_date: date):
     # -----------------------------
     # 1. 获取所有需要更新streak的视频
     # -----------------------------
+    graduated_snapshot = exists().where(
+        and_(
+            Snapshot.bvid == Video.bvid,
+            Snapshot.view >= MIN_TOTAL_VIEW
+        )
+    )
     
     stmt = (
         select(Video)
-        .join(Snapshot, and_(
-            Snapshot.bvid == Video.bvid,
-            Snapshot.view < MIN_TOTAL_VIEW,
-        ))
         .where(
             Video.disabled.is_(False),
-            Video.streak_date < current_date
+            Video.streak_date < current_date,
+            ~graduated_snapshot
         )
     )
     
@@ -76,13 +79,6 @@ async def update_video_streaks(session: AsyncSession, current_date: date):
         streak = video.streak
         latest = latest_map.get(bvid)
         prev = prev_map.get(bvid)
-
-        # 计算日涨
-        daily_increase = 0
-        if latest and prev:
-            daily_increase = latest.view - prev.view
-            if daily_increase < 0:
-                daily_increase = 0  # 防止数据异常
 
         # ==============================================================
         # A. 当天有 Snapshot
