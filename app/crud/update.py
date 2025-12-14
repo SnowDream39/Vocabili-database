@@ -14,9 +14,9 @@ async def update_video_streaks(session: AsyncSession, current_date: date):
     """
 
     # -----------------------------
-    # 1. 获取所有需要更新streak的视频
+    # 0. 所有已毕业视频置0
     # -----------------------------
-    graduated_snapshot = exists().where(
+    graduated = exists().where(
         and_(
             Snapshot.bvid == Video.bvid,
             Snapshot.view >= MIN_TOTAL_VIEW
@@ -24,14 +24,25 @@ async def update_video_streaks(session: AsyncSession, current_date: date):
     )
     
     stmt = (
+        update(Video)
+        .where(graduated)
+        .values(streak=0)
+        )
+    
+    await session.execute(stmt)
+    
+    
+    # -----------------------------
+    # 1. 获取所有需要更新streak的视频
+    # -----------------------------
+    stmt = (
         select(Video)
         .where(
-            Video.disabled.is_(False),
-            Video.streak_date < current_date,
-            ~graduated_snapshot
+            ~graduated,
+            Video.streak_date < current_date
         )
     )
-    
+
     videos = (await session.execute(stmt)).scalars().all()
     if not videos:
         return
@@ -84,9 +95,7 @@ async def update_video_streaks(session: AsyncSession, current_date: date):
         # A. 当天有 Snapshot
         # ==============================================================
         if latest:
-            if latest.view >= 10000:
-                streak = 0
-            elif not prev:
+            if not prev:
                 # 没有上次Snapshot，说明新曲，不给streak
                 streak = 0
             else:
