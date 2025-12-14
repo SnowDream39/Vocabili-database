@@ -34,9 +34,10 @@ async def ranking(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1),
     order_type: Literal['score','view','favorite','coin','like'] = Query(default='score'),
+    seperate: bool = Query(False),
     session: AsyncSession = Depends(get_async_session)
 ):
-    return await get_ranking(board, part, issue, page, page_size, order_type, session)
+    return await get_ranking(board, part, issue, page, page_size, order_type, seperate, session)
     
 @router.get('/ranking/top5')
 async def ranking_top5(

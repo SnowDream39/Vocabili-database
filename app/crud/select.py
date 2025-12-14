@@ -1,18 +1,19 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text, distinct, and_
 from sqlalchemy.orm import selectinload, aliased
-from sqlalchemy.dialects.postgresql import array_agg
+from sqlalchemy.dialects.postgresql import aggregate_order_by, array_agg
 
 from app.session import get_async_session, engine
 from app.models import Song, song_producer, song_synthesizer, song_vocalist, Producer, Synthesizer, Vocalist, Uploader, Video, Ranking, Snapshot, TABLE_MAP, REL_MAP, song_load_full
 
 from app.utils.misc import make_artist_str
 from app.utils.bilibili_id import bv2av
-from app.utils.date import get_last_census_date
+from app.utils.date import get_last_census_date, get_seperate_start_end_issues
 from datetime import datetime
 
 from typing import Literal
 from abv_py import bv2av
+
 
 async def get_names(
     type: str,
@@ -208,14 +209,18 @@ async def get_ranking(
     page: int,
     page_size: int ,
     order_type: Literal['score','view','favorite','coin','like'] ,
+    seperate: bool,
     session: AsyncSession 
 ):
+    
+
     if (issue == None):
         result = await session.execute(
             select(func.max(Ranking.issue))
             .where(Ranking.board == board, Ranking.part == part)
         )
         issue = int(result.scalar_one())
+        
         
     order_map = {
         'score': Ranking.rank,
@@ -225,39 +230,97 @@ async def get_ranking(
         'like': Ranking.like_rank
     }
     
+    seperate_board_map = {
+        'vocaloid-weekly': 'vocaloid-daily',
+        'vocaloid-monthly': 'vocaloid-weekly',
+    }
+
     prev_issue = issue - 1
     PrevRanking = aliased(Ranking)
-    stmt = (
-        select(Ranking, PrevRanking)
-        .join(Song, Ranking.song_id == Song.id)
-        .join(Video, Ranking.bvid == Video.bvid)
-        .outerjoin(PrevRanking, and_(
-            PrevRanking.song_id == Ranking.song_id,
-            PrevRanking.board == board,
-            PrevRanking.part == part,
-            PrevRanking.issue == prev_issue
-        ))
-        .options(
-            selectinload(Ranking.song).selectinload(Song.vocalists),
-            selectinload(Ranking.song).selectinload(Song.producers),
-            selectinload(Ranking.song).selectinload(Song.synthesizers),
-            selectinload(Ranking.video).selectinload(Video.uploader)
+    
+    if seperate:
+        SeperateRanking = aliased(Ranking)
+        seperate_start_issue, seperate_end_issue = get_seperate_start_end_issues(board, issue)
+        
+        stmt = (
+            select(
+                Ranking, 
+                PrevRanking,
+                array_agg(aggregate_order_by(SeperateRanking.rank, SeperateRanking.issue))
+            )
+            .join(Song, Ranking.song_id == Song.id)
+            .join(Video, Ranking.bvid == Video.bvid)
+            .outerjoin(PrevRanking, and_(
+                PrevRanking.song_id == Ranking.song_id,
+                PrevRanking.board == board,
+                PrevRanking.part == part,
+                PrevRanking.issue == prev_issue
+            ))
+            .outerjoin(SeperateRanking, and_(
+                SeperateRanking.song_id == Ranking.song_id,
+                SeperateRanking.board == seperate_board_map[board],
+                SeperateRanking.part == part,
+                SeperateRanking.issue >= seperate_start_issue,
+                SeperateRanking.issue <= seperate_end_issue,
+            ))
+            .options(
+                selectinload(Ranking.song).selectinload(Song.vocalists),
+                selectinload(Ranking.song).selectinload(Song.producers),
+                selectinload(Ranking.song).selectinload(Song.synthesizers),
+                selectinload(Ranking.video).selectinload(Video.uploader)
+            )
+            .where(Ranking.board == board, Ranking.part == part, Ranking.issue == issue)
+            .group_by(Ranking.id, PrevRanking.id)
+            .order_by(order_map[order_type])
+            .offset((page-1) * page_size)
+            .limit(page_size)
         )
-        .where(Ranking.board == board, Ranking.part == part, Ranking.issue == issue)
-        .order_by(order_map[order_type])
-        .offset((page-1) * page_size)
-        .limit(page_size)
-    )
-    result = await session.execute(stmt)
-    rows = result.all()  # 每行是 (cur_ranking, prev_ranking_or_None)
+        result = await session.execute(stmt)
+        rows = result.all()  # 每行是 (cur_ranking, prev_ranking_or_None)
 
+        # 4) 把 prev_ranking 作为 runtime attribute 绑定到 cur_ranking.last 上
+        data = []
+        for cur, prev, seperates in rows:
+            # 动态添加属性（只在内存中），不会影响 DB/ORM 配置
+            setattr(cur, "last", prev)
+            setattr(cur, "seperates", seperates)
+            data.append(cur)
+    else:
+         
+        stmt = (
+            select(
+                Ranking, 
+                PrevRanking
+            )
+            .join(Song, Ranking.song_id == Song.id)
+            .join(Video, Ranking.bvid == Video.bvid)
+            .outerjoin(PrevRanking, and_(
+                PrevRanking.song_id == Ranking.song_id,
+                PrevRanking.board == board,
+                PrevRanking.part == part,
+                PrevRanking.issue == prev_issue
+            ))
+            .options(
+                selectinload(Ranking.song).selectinload(Song.vocalists),
+                selectinload(Ranking.song).selectinload(Song.producers),
+                selectinload(Ranking.song).selectinload(Song.synthesizers),
+                selectinload(Ranking.video).selectinload(Video.uploader)
+            )
+            .where(Ranking.board == board, Ranking.part == part, Ranking.issue == issue)
+            .group_by(Ranking.id, PrevRanking.id)
+            .order_by(order_map[order_type])
+            .offset((page-1) * page_size)
+            .limit(page_size)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()  # 每行是 (cur_ranking, prev_ranking_or_None)
 
-    # 4) 把 prev_ranking 作为 runtime attribute 绑定到 cur_ranking.last 上
-    data = []
-    for cur, prev in rows:
-        # 动态添加属性（只在内存中），不会影响 DB/ORM 配置
-        setattr(cur, "last", prev)
-        data.append(cur)
+        # 4) 把 prev_ranking 作为 runtime attribute 绑定到 cur_ranking.last 上
+        data = []
+        for cur, prev in rows:
+            # 动态添加属性（只在内存中），不会影响 DB/ORM 配置
+            setattr(cur, "last", prev)
+            data.append(cur)
         
     # 5) 查询本期排行的总量
     
