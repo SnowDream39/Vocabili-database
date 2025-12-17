@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, exists, text
 from sqlalchemy.orm import selectinload
 
-from app.models import Song, Video, TABLE_MAP, song_load_full
+from app.models import Song, Video, Uploader, TABLE_MAP, REL_MAP, song_load_full
 from app.stores.async_store import AsyncStore, SessionLocal
 from app.utils.search import accurate_search
 from app.utils import modify_text
@@ -26,7 +26,6 @@ def create_load_modified_name_id_map_factory(table_name: str):
             result = await session.execute(stmt)
             rows = result.all()
 
-        # 有潜在问题，因为标准化后的名称可能会重复，所以改成 name -> id[] 会更好，待改
         names_map: dict[str, list] = {}
         
         for id_value, name in rows:
@@ -42,6 +41,9 @@ def create_load_modified_name_id_map_factory(table_name: str):
 async def normal_search(
     table_name: Literal['song', 'video', 'producer', 'vocalist', 'synthesizer', 'uploader'] ,
     keyword: str,
+    includeEmpty: bool,
+    page: int,
+    page_size: int,
     session: AsyncSession
 ):
     table = TABLE_MAP[table_name]
@@ -61,9 +63,17 @@ async def normal_search(
     ids = list(id_accuracy_map.keys())
     
     if table == Song:
+        where_conditions: list = [
+            Song.id.in_(ids),
+        ]
+        if not includeEmpty:
+            where_conditions.append(
+                exists().where(Song.id == Video.song_id)
+            )
+            
         stmt = (
             select(Song)
-            .where(Song.id.in_(ids))
+            .where(*where_conditions)
             .options(*song_load_full)
         )
     elif table == Video:
@@ -75,17 +85,46 @@ async def normal_search(
                 selectinload(Video.song)
             )
         )
+    elif table == Uploader:
+        where_conditions: list = [
+            Uploader.id.in_(ids),
+        ]
+        if not includeEmpty:
+            where_conditions.append(
+                exists().where(Video.uploader_id == Uploader.id)
+            )
+        stmt = (
+            select(Uploader)
+            .where(*where_conditions)
+        )
     else:
+        rel = REL_MAP[table_name]
+        where_conditions: list = [
+            table.id.in_(ids),
+        ]
+        if not includeEmpty:
+            where_conditions.append(
+                exists().where(rel.c.artist_id == table.id)
+            )
         stmt = (
             select(table)
-            .where(table.id.in_(ids))
+            .where(*where_conditions)
         )
 
     result = await session.execute(stmt)
     data = result.scalars().all()
     
-    return sorted(
+    total_data = sorted(
         data, 
         key=lambda x: id_accuracy_map[getattr(x, id_attr)], 
         reverse=True
     )
+    
+    start = (page - 1) * page_size
+    end = start + page_size
+    data = total_data[start:end]
+    
+    return {
+        'data': data,
+        'total': len(total_data)
+    }

@@ -10,18 +10,10 @@ router = APIRouter(prefix='/search', tags=['search'])
 async def search(
     type: Literal['song', 'video', 'producer', 'vocalist', 'synthesizer', 'uploader'],
     keyword: str = Query(...),
+    includeEmpty: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1),
     session: AsyncSession = Depends(get_async_session)
 ):
-    total_data = await normal_search(type, keyword, session)
+    return await normal_search(type, keyword, includeEmpty, page, page_size, session)
     
-    start = (page - 1) * page_size
-    end = start + page_size
-    data = total_data[start:end]
-    
-    return {
-        'status': 'ok',
-        'data': data,
-        'total': len(total_data)
-    }
