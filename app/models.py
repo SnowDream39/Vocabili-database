@@ -124,10 +124,10 @@ class Video(Base):
     page: Mapped[int] = mapped_column(SmallInteger, nullable=True)
     disabled: Mapped[bool] = mapped_column(Boolean, nullable=True)
 
-    uploader: Mapped["Uploader"] = relationship("Uploader", back_populates="videos")
+    uploader: Mapped["Uploader"] = relationship("Uploader",  back_populates="videos")
     song: Mapped["Song"] = relationship("Song", back_populates="videos")
-    snapshots: Mapped[List["Snapshot"]] = relationship("Snapshot", back_populates="video")
-    rankings: Mapped[List["Ranking"]] = relationship("Ranking", back_populates="video")
+    snapshots: Mapped[List["Snapshot"]] = relationship("Snapshot", primaryjoin="Video.bvid == foreign(Snapshot.bvid)", back_populates="video")
+    rankings: Mapped[List["Ranking"]] = relationship("Ranking",  primaryjoin="Ranking.bvid == foreign(Video.bvid)",  back_populates="video")
 
     streak: Mapped[int] = mapped_column(SmallInteger, nullable=True)
     streak_date: Mapped[datetype] = mapped_column(Date, nullable=True)
@@ -137,7 +137,7 @@ class Snapshot(Base):
     数据记录
     """
     __tablename__ = 'snapshot'
-    bvid: Mapped[str] = mapped_column(String, ForeignKey("video.bvid"), autoincrement=False)
+    bvid: Mapped[str] = mapped_column(String, autoincrement=False)
     date: Mapped[datetype] = mapped_column(Date)
 
     view: Mapped[int] = mapped_column(Integer)
@@ -145,7 +145,7 @@ class Snapshot(Base):
     coin: Mapped[int] = mapped_column(Integer)
     like: Mapped[int] = mapped_column(Integer)
     
-    video: Mapped["Video"] = relationship("Video", back_populates="snapshots")
+    video: Mapped["Video"] = relationship("Video", primaryjoin="Video.bvid == foreign(Snapshot.bvid)", back_populates="snapshots")
     
     __table_args__ = (
         PrimaryKeyConstraint("bvid", 'date'),
@@ -162,7 +162,7 @@ class Ranking(Base):
     issue: Mapped[str] = mapped_column(SmallInteger, index=True)
     rank: Mapped[int] = mapped_column(Integer, index=True)
     song_id: Mapped[int] = mapped_column(Integer, ForeignKey('song.id'), index=True)
-    bvid: Mapped[str] = mapped_column(String(12), ForeignKey('video.bvid'), index=True)
+    bvid: Mapped[str] = mapped_column(String(12), index=True)
     count: Mapped[int] = mapped_column(SmallInteger, nullable=True)
     point: Mapped[int] = mapped_column(Integer)
     view: Mapped[int] = mapped_column(Integer)
@@ -175,7 +175,7 @@ class Ranking(Base):
     like_rank: Mapped[int] = mapped_column(Integer)
 
     song: Mapped["Song"] = relationship("Song", back_populates="rankings")
-    video: Mapped["Video"] = relationship("Video", back_populates="rankings")
+    video: Mapped["Video"] = relationship("Video", primaryjoin="Ranking.bvid == foreign(Video.bvid)", back_populates="rankings")
     
     __table_args__ = (
         Index('idx_ranking_board_part', 'board', 'part'),
