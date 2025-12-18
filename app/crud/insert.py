@@ -1,6 +1,6 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_, update, delete, insert
+from sqlalchemy import select, delete, and_, update, delete, insert, values, column, Integer, String
 from sqlalchemy.dialects.postgresql import insert as insert
 from sqlalchemy.exc import IntegrityError
 
@@ -163,35 +163,82 @@ async def insert_artists(
 async def insert_songs(session: AsyncSession, df, cache: Cache | None = None):
     if not cache:
         cache = Cache()
+
     ensure_columns(df, ['image_url'])
     await cache.ensure_loaded(session, ['song_map'])
-    # (name, type)
+
     SongRecord = namedtuple('SongRecord', ['name', 'type'])
+    UpdateSongRecord = namedtuple('UpdateSongRecord', ['id', 'type'])
+
     song_records: list[SongRecord] = []
     for row in df.to_dict(orient='records'):
         name = row['name']
         song_type = row['type'] if not pd.isna(row['type']) else None
         if not pd.isna(name):
             song_records.append(SongRecord(name, song_type))
-        
-    song_records = list(set(song_records))
-    if song_records:
-        excluded = insert(Song).excluded
-        song_table_columns = ['name', 'type']
-        stmt = insert(Song).values([
-            {k: v for k, v in s._asdict().items() if k in song_table_columns}
-            for s in song_records
-            ]).on_conflict_do_update(
-            index_elements=['name'],
-            # 目前不更新 display_name
-            set_={ 'type': excluded['type'] }
-        ).returning(Song.id, Song.name)
+
+    # 🔧 新增：name -> type 映射（后面的唯一数据来源）
+    name_type_map = {
+        r.name: r.type
+        for r in song_records
+    }
+
+    song_names = set(name_type_map.keys())
+    existing_song_names = set(cache.song_map.keys())
+
+    new_song_names = song_names - existing_song_names
+    update_song_names = song_names & existing_song_names
+
+    # ✅ 修复 1：正确构造 new_song_records
+    new_song_records = [
+        SongRecord(name, name_type_map[name])
+        for name in new_song_names
+    ]
+
+    if new_song_records:
+        stmt = (
+            insert(Song)
+            .values(
+                [
+                    {
+                        "name": s.name,
+                        "type": s.type
+                    }
+                    for s in new_song_records
+                ]
+            )
+            .returning(Song.id, Song.name)
+        )
+
         result = await session.execute(stmt)
-        await session.flush()
         rows = result.all()
-        
-        cache.song_map.update({r[1]: r[0] for r in rows})
-    
+        cache.song_map.update({name: id for id, name in rows})
+
+    # ✅ 修复 2：正确构造 update_song_records
+    update_song_records = [
+        UpdateSongRecord(cache.song_map[name], name_type_map[name])
+        for name in update_song_names
+    ]
+
+    if update_song_records:
+        v = (
+            values(
+                column("id", Integer),
+                column("type", String)
+            )
+            .data(
+                [(s.id, s.type) for s in update_song_records]
+            )
+            .alias("v")
+        )
+
+        await session.execute(
+            update(Song)
+            .where(Song.id == v.c.id)
+            .values(type=v.c.type)
+        )
+
+
 
 
 async def insert_relations(
