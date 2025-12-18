@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query 
+from fastapi.responses import StreamingResponse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,8 +68,11 @@ async def import_rankings(
     
     cache = Cache()
     
-    await execute_import_rankings(session, board, part, issue, strict, cache)
-
+    return StreamingResponse(
+        execute_import_rankings(session, board, part, issue, strict, cache),
+        media_type='text/event-stream'
+    )
+    
 
 
 
@@ -100,5 +104,5 @@ async def batch_import_ranking(
     cache = Cache()
     for issue in range(start_issue, end_issue+1):
         print(f'正在处理：{issue}期')
-        await execute_import_rankings(session, board, part, issue, False, cache)
-
+        async for s in execute_import_rankings(session, board, part, issue, False, cache):
+            print(s)

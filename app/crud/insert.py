@@ -14,12 +14,10 @@ from ..utils.cache import Cache
 
 import pandas as pd
 from datetime import datetime, timedelta, date
-
+import math
 from collections import namedtuple
 
-
-
-BATCH_SIZE = 200
+BATCH_SIZE = 100
 
 # =================  比较小的操作，不对外公开  ====================
 
@@ -489,11 +487,15 @@ async def execute_import_rankings(
         errors = validate_excel(df)
         if len(errors) >= 1:
             raise Exception("\n".join(errors))
+        yield "event: progress\ndata: 数据验证通过\n\n"
 
     try:
         
         total = len(df)
-        for start in range(0, total, BATCH_SIZE):
+        total_batches = math.ceil(total / BATCH_SIZE)
+        for i in range(total_batches):
+            yield f"event: progress\ndata: 正在执行第 {i+1}/{total_batches} 批次...\n\n"
+            start = i * BATCH_SIZE
             end = start + BATCH_SIZE
             batch_df = df.iloc[start: end].copy()
             print(f"{start} ~ {end}")
@@ -528,7 +530,8 @@ async def execute_import_rankings(
             insert_stmt = insert(Ranking).values(records).on_conflict_do_nothing()
             await session.execute(insert_stmt)
             await session.commit()
-
+            
+        yield "event: complete\ndata: 完成\n\n"
 
     
     except IntegrityError as e:
