@@ -16,6 +16,7 @@ import pandas as pd
 from datetime import datetime, timedelta, date
 import math
 from collections import namedtuple
+import asyncio
 
 BATCH_SIZE = 100
 
@@ -532,7 +533,6 @@ async def execute_import_rankings(
             await session.commit()
             
         yield "event: complete\ndata: 完成\n\n"
-
     
     except IntegrityError as e:
         await session.rollback()
