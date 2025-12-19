@@ -644,6 +644,19 @@ async def get_song_snapshot(
         'total': total
     }
 
+async def get_video(
+    bvid: str,
+    session: AsyncSession
+):    
+    stmt = (
+        select(Video)
+        .where(Video.bvid == bvid)
+    )
+    result = await session.execute(stmt)
+    data = result.scalars().one()
+    return {
+        'data': data
+    }
 
 async def get_video_snapshot_by_date(
     bvid: str,

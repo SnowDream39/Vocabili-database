@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.session import get_async_session
-from app.crud.select import get_songs_detail, get_artist_songs, get_ranking, get_artist, get_song, get_song_by_achievement, get_video_snapshot_by_date, get_song_ranking, get_latest_ranking, get_ranking_top5, get_song_snapshot
+from app.crud.select import get_songs_detail, get_artist_songs, get_ranking, get_artist, get_song, get_song_by_achievement, get_video_snapshot_by_date, get_song_ranking, get_latest_ranking, get_ranking_top5, get_song_snapshot, get_video
 from typing import Literal
 
 router = APIRouter(prefix='/select', tags=['select'])
@@ -102,6 +102,13 @@ async def artist(
 ):
     return await get_artist(type, id, session)
     
+@router.get("/video")
+async def video(
+    bvid: str = Query(),
+    session: AsyncSession = Depends(get_async_session)
+):    
+    return await get_video(bvid, session)
+
 
 @router.get("/video/snapshot")
 async def song_snapshot(
