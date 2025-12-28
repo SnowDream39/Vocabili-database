@@ -10,13 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from app.config import settings
-from app.routers.update import router as update_router
-from app.routers.select import router as select_router
-from app.routers.upload import router as upload_router
-from app.routers.test import router as test_router
-from app.routers.edit import router as edit_router
-from app.routers.output import router as output_router
-from app.routers.search import router as search_router
+from app.routers import update, select, upload, test, edit, output, search
 from app.stores import data_store
 
 from app.utils.task import task_manager, cleanup_worker
@@ -36,13 +30,13 @@ async def root():
     return RedirectResponse(url="/v2/docs")
 
 # 挂载子路由
-app.include_router(update_router)
-app.include_router(select_router)
-app.include_router(upload_router)
-app.include_router(test_router)
-app.include_router(edit_router)
-app.include_router(output_router)
-app.include_router(search_router)
+app.include_router(update.router)
+app.include_router(select.router)
+app.include_router(upload.router)
+app.include_router(test.router)
+app.include_router(edit.router)
+app.include_router(output.router)
+app.include_router(search.router)
 
 # 设置生命周期事件
 
