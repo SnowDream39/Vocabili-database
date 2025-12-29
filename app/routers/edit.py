@@ -40,7 +40,7 @@ async def edit_song(
     stmt = select(Song).where(Song.name == song.name)
     result = await session.execute(stmt)
     exist_song = result.scalar_one_or_none()
-    if exist_song: 
+    if exist_song and exist_song.id != song.id: 
         raise HTTPException(status_code=400, detail=f'名称"{song.name}"已存在')
     
     stmt = (
